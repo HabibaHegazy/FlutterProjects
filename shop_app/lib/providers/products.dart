@@ -1,42 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'product.dart';
 
 class Products with ChangeNotifier {
-  List<Product> _products = [
-    Product(
-      id: 'p1',
-      title: 'Red Shirt',
-      description: 'A red shirt - it is pretty red!',
-      price: 29.99,
-      imageUrl:
-          'https://cdn.pixabay.com/photo/2016/10/02/22/17/red-t-shirt-1710578_1280.jpg',
-    ),
-    Product(
-      id: 'p2',
-      title: 'Trousers',
-      description: 'A nice pair of trousers.',
-      price: 59.99,
-      imageUrl:
-          'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Trousers%2C_dress_%28AM_1960.022-8%29.jpg/512px-Trousers%2C_dress_%28AM_1960.022-8%29.jpg',
-    ),
-    Product(
-      id: 'p3',
-      title: 'Yellow Scarf',
-      description: 'Warm and cozy - exactly what you need for the winter.',
-      price: 19.99,
-      imageUrl:
-          'https://live.staticflickr.com/4043/4438260868_cc79b3369d_z.jpg',
-    ),
-    Product(
-      id: 'p4',
-      title: 'A Pan',
-      description: 'Prepare any meal you want.',
-      price: 49.99,
-      imageUrl:
-          'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Cast-Iron-Pan.jpg/1024px-Cast-Iron-Pan.jpg',
-    ),
-  ];
+  List<Product> _products = [];
 
   // bool _showFavoritesOnly = false;
 
@@ -64,27 +34,109 @@ class Products with ChangeNotifier {
   //   notifyListeners();
   // }
 
-  void addProduct(Product product) {
-    final newProduct = Product(
-        title: product.title,
-        description: product.description,
-        price: product.price,
-        imageUrl: product.imageUrl,
-        id: DateTime.now().toString());
-    _products.add(newProduct);
-    // _products.insert(0, newProduct); // at the start of the list
-    notifyListeners();
-  }
+  Future<void> fetchAndSetProducts() async {
+    const url = 'https://my-shopp-app.herokuapp.com/products/1';
 
-  void updateProduct(String id, Product newProduct) {
-    final productIndex = _products.indexWhere((prod) => prod.id == id);
-    if (productIndex >= 0) {
-      _products[productIndex] = newProduct;
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+      );
+      // print(json.decode(response.body));
+      final extractedObject = json.decode(response.body) as Map<String, Object>;
+      final extractedData = extractedObject['data'] as List<dynamic>;
+      List<Product> loadedProoducts = [];
+      extractedData.forEach((data) {
+        //print(data);
+        loadedProoducts.add(Product(
+          id: data['_id'],
+          title: data['title'],
+          description: data['description'],
+          price: double.parse(data['price'].toString()),
+          imageUrl: data['image'],
+          // isFavorite: (data['isFavorite'].toLowerCase() == 'true'),
+        ));
+      });
+      _products = loadedProoducts;
       notifyListeners();
+    } catch (error) {
+      throw error;
     }
   }
 
-  void deleteProduct(String id) {
+  Future<void> addProduct(Product product) async {
+    // ProductService service = new ProductService(product);
+    // service.saveToDatabase();
+    const url = 'https://my-shopp-app.herokuapp.com/products/product';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          'title': product.title,
+          'description': product.description,
+          'image': product.imageUrl,
+          'price': product.price,
+        }),
+      );
+      print(json.decode(response.body));
+      final newProduct = Product(
+          title: product.title,
+          description: product.description,
+          price: product.price,
+          imageUrl: product.imageUrl,
+          id: json.decode(response.body)['id']);
+      _products.add(newProduct);
+      // _products.insert(0, newProduct); // at the start of the list
+      notifyListeners();
+    } catch (error) {
+      print(error);
+      throw error;
+    }
+  }
+
+  Future<void> updateProduct(String id, Product newProduct) async {
+    final productIndex = _products.indexWhere((prod) => prod.id == id);
+    if (productIndex >= 0) {
+      final url = 'https://my-shopp-app.herokuapp.com/products/product/$id';
+
+      try {
+        final response = await http.patch(
+          Uri.parse(url),
+          headers: {"Content-Type": "application/json"},
+          body: json.encode({
+            'title': newProduct.title,
+            'description': newProduct.description,
+            'image': newProduct.imageUrl,
+            'price': newProduct.price,
+            // 'isFavorite': newProduct.isFavorite
+          }),
+        );
+        print(json.decode(response.body));
+        _products[productIndex] = newProduct;
+        notifyListeners();
+      } catch (error) {
+        print(error);
+        throw error;
+      }
+    }
+  }
+
+  void deleteProduct(String id) async {
+    final url = 'https://my-shopp-app.herokuapp.com/products/product/$id';
+
+    try {
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+      );
+      print(json.decode(response.body));
+    } catch (error) {
+      print(error);
+      throw error;
+    }
+
     _products.removeWhere((prod) => prod.id == id);
     notifyListeners();
   }
